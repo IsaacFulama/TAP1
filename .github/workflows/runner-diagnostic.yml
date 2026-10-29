@@ -1,0 +1,23 @@
+name: Runner Diagnostic
+
+on:
+  push:
+    branches: [maintenance/security-payment-integrity]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runner-smoke-test:
+    name: Runner smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Verify runner starts
+        run: |
+          echo "GitHub Actions runner started successfully."
+          python --version
+          git --version
