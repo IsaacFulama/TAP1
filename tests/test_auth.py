@@ -5,7 +5,10 @@ Ce module contient les tests pour le système d'authentification sécurisé
 incluant le hashage des mots de passe et la gestion des tentatives.
 """
 
+import os
+
 import pytest
+import tap.core.auth as auth_module
 from tap.core.auth import AuthenticationManager, authenticate_user
 
 
@@ -13,7 +16,8 @@ class TestAuthenticationManager:
     """Tests pour le gestionnaire d'authentification."""
     
     def setup_method(self):
-        """Initialise un gestionnaire d'authentification pour chaque test."""
+        """Initialise un gestionnaire avec un secret de test explicite."""
+        os.environ["TAP_ADMIN_INITIAL_PASSWORD"] = "TestAdmin-Password-123"
         self.auth_manager = AuthenticationManager()
     
     def test_default_user_exists(self):
@@ -22,7 +26,7 @@ class TestAuthenticationManager:
     
     def test_default_user_authentication(self):
         """Teste l'authentification avec l'utilisateur par défaut."""
-        success, message = self.auth_manager.authenticate("TAPADM", "TAPADM")
+        success, message = self.auth_manager.authenticate("TAPADM", "TestAdmin-Password-123")
         assert success is True
         assert "réussie" in message.lower()
     
@@ -93,7 +97,7 @@ class TestAuthenticationManager:
     
     def test_change_password(self):
         """Teste le changement de mot de passe."""
-        old_password = "TAPADM"
+        old_password = "TestAdmin-Password-123"
         new_password = "newpassword123"
         
         success, message = self.auth_manager.change_password("TAPADM", old_password, new_password)
@@ -115,7 +119,7 @@ class TestAuthenticationManager:
     
     def test_change_password_short_new_password(self):
         """Teste qu'on ne peut pas mettre un mot de passe trop court."""
-        success, message = self.auth_manager.change_password("TAPADM", "TAPADM", "short")
+        success, message = self.auth_manager.change_password("TAPADM", "TestAdmin-Password-123", "short")
         assert success is False
         assert "au moins 8 caractères" in message.lower()
     
@@ -199,13 +203,17 @@ class TestAuthenticationManager:
 class TestAuthenticateUser:
     """Tests pour la fonction utilitaire d'authentification."""
     
-    def test_authenticate_user_success(self):
+    def test_authenticate_user_success(self, monkeypatch):
         """Teste l'authentification réussie via la fonction utilitaire."""
-        success, message = authenticate_user("TAPADM", "TAPADM")
+        monkeypatch.setenv("TAP_ADMIN_INITIAL_PASSWORD", "TestAdmin-Password-123")
+        monkeypatch.setattr(auth_module, "auth_manager", AuthenticationManager())
+        success, message = authenticate_user("TAPADM", "TestAdmin-Password-123")
         assert success is True
     
-    def test_authenticate_user_failure(self):
+    def test_authenticate_user_failure(self, monkeypatch):
         """Teste l'échec de l'authentification via la fonction utilitaire."""
+        monkeypatch.setenv("TAP_ADMIN_INITIAL_PASSWORD", "TestAdmin-Password-123")
+        monkeypatch.setattr(auth_module, "auth_manager", AuthenticationManager())
         success, message = authenticate_user("TAPADM", "wrongpassword")
         assert success is False
 
