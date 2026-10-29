@@ -2,7 +2,7 @@
 Module d'authentification sécurisée avec hashage de mots de passe.
 
 Ce module fournit une gestion sécurisée de l'authentification des utilisateurs
-en utilisant bcrypt pour le hashage des mots de passe.
+en utilisant scrypt pour le hashage des mots de passe.
 """
 
 import hashlib
