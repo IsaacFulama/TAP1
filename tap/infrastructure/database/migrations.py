@@ -213,7 +213,10 @@ def migrer_mois_vers_date():
         invalid_ids = []
 
         for paiement_id, raw_mois in rows:
-            parsed = parse_mois_saisie(raw_mois)
+            try:
+                parsed = parse_mois_saisie(raw_mois)
+            except (TypeError, ValueError, OverflowError):
+                parsed = None
             if parsed is None:
                 invalid_ids.append(paiement_id)
             else:
