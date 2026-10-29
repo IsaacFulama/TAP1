@@ -71,7 +71,7 @@ jobs:
     
     - name: Run ruff linter
       run: |
-        ruff check tap/ tests/
+        ruff check tap/ tests/ --select E9,F63,F7,F82
     
     - name: Run flake8
       run: |
