@@ -39,37 +39,34 @@ class AuthenticationManager:
         logger.warning("Utilisateur par défaut initialisé. Changez le mot de passe en production!")
     
     def _hash_password(self, password: str) -> str:
-        """
-        Hash un mot de passe en utilisant SHA-256 avec sel.
-        
-        Args:
-            password: Mot de passe en clair
-            
-        Returns:
-            str: Mot de passe hashé
-        """
-        salt = secrets.token_hex(16)
-        password_hash = hashlib.sha256((password + salt).encode()).hexdigest()
-        return f"{salt}:{password_hash}"
-    
+        """Hash un mot de passe avec scrypt, conçu pour ralentir les attaques hors ligne."""
+        salt = secrets.token_bytes(16)
+        digest = hashlib.scrypt(
+            password.encode("utf-8"), salt=salt, n=2**14, r=8, p=1, dklen=32
+        )
+        return "scrypt$" + salt.hex() + "$" + digest.hex()
+
     def _verify_password(self, password: str, password_hash: str) -> bool:
-        """
-        Vérifie si un mot de passe correspond au hash.
-        
-        Args:
-            password: Mot de passe en clair à vérifier
-            password_hash: Hash stocké
-            
-        Returns:
-            bool: True si le mot de passe correspond
-        """
+        """Vérifie un hash scrypt ou un ancien hash SHA-256 pour permettre la migration."""
         try:
-            salt, stored_hash = password_hash.split(":")
-            computed_hash = hashlib.sha256((password + salt).encode()).hexdigest()
-            return computed_hash == stored_hash
-        except (ValueError, AttributeError):
+            if password_hash.startswith("scrypt$"):
+                algorithm, salt_hex, stored_hash = password_hash.split("$")
+                if algorithm != "scrypt":
+                    return False
+                salt = bytes.fromhex(salt_hex)
+                computed = hashlib.scrypt(
+                    password.encode("utf-8"), salt=salt, n=2**14, r=8, p=1, dklen=32
+                ).hex()
+                return secrets.compare_digest(computed, stored_hash)
+
+            # Compatibilité transitoire : les anciens hashes sont migrés à la
+            # première authentification réussie dans authenticate().
+            salt_hex, stored_hash = password_hash.split(":")
+            computed = hashlib.sha256((password + salt_hex).encode("utf-8")).hexdigest()
+            return secrets.compare_digest(computed, stored_hash)
+        except (ValueError, AttributeError, TypeError):
             return False
-    
+
     def _is_account_locked(self, username: str) -> bool:
         """
         Vérifie si un compte est verrouillé suite à trop de tentatives.
@@ -123,6 +120,10 @@ class AuthenticationManager:
         
         # Vérifier le mot de passe
         if self._verify_password(password, user["password_hash"]):
+            # Migration progressive des anciens hashes SHA-256 vers scrypt.
+            if not user["password_hash"].startswith("scrypt$"):
+                user["password_hash"] = self._hash_password(password)
+
             # Réinitialiser les tentatives échouées
             if username in self._failed_attempts:
                 del self._failed_attempts[username]
