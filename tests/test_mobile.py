@@ -38,3 +38,27 @@ def test_offline_queue_is_durable(tmp_path: Path):
     assert queue.pending()[0]["event_id"] == event_id
     queue.mark_result(event_id, "conflict", {"message": "changed"})
     assert queue.pending() == []
+
+
+
+import pytest
+
+
+@pytest.mark.parametrize("amount", [-1, 0, "NaN", "Infinity", "-Infinity", "not-a-number"])
+def test_direct_mobile_payment_rejects_invalid_amount(monkeypatch, amount):
+    monkeypatch.setenv("TAP_MOBILE_API_KEY", "test-secret")
+    called = []
+    monkeypatch.setattr(
+        "tap.mobile.api.ajouter_paiement_complementaire",
+        lambda payment_id, value: called.append((payment_id, value)) or (True, "ok"),
+    )
+    client = create_app().test_client()
+
+    response = client.post(
+        "/api/mobile/payments/1/record",
+        json={"amount": amount},
+        headers={"X-TAP-Mobile-Key": "test-secret"},
+    )
+
+    assert response.status_code == 400
+    assert called == []
