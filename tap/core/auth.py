@@ -6,6 +6,7 @@ en utilisant bcrypt pour le hashage des mots de passe.
 """
 
 import hashlib
+import os
 import secrets
 import logging
 from typing import Optional, Tuple
@@ -25,19 +26,24 @@ class AuthenticationManager:
         self._initialize_default_user()
     
     def _initialize_default_user(self) -> None:
-        """Initialise l'utilisateur par défaut avec un mot de passe hashé."""
-        # Mot de passe par défaut : TAPADM
-        # En production, cela devrait être changé immédiatement
-        default_password = "TAPADM"
-        hashed_password = self._hash_password(default_password)
-        self._users["TAPADM"] = {
-            "password_hash": hashed_password,
+        """Crée l'administrateur initial uniquement si un secret est configuré."""
+        username = os.getenv("TAP_ADMIN_INITIAL_USERNAME", "TAPADM").strip()
+        password = os.getenv("TAP_ADMIN_INITIAL_PASSWORD", "")
+        if not username or len(password) < 12:
+            logger.error(
+                "Aucun administrateur initial créé : configurez TAP_ADMIN_INITIAL_PASSWORD "
+                "avec au moins 12 caractères avant de lancer l'application."
+            )
+            return
+
+        self._users[username] = {
+            "password_hash": self._hash_password(password),
             "created_at": datetime.now(),
             "last_login": None,
-            "is_active": True
+            "is_active": True,
         }
-        logger.warning("Utilisateur par défaut initialisé. Changez le mot de passe en production!")
-    
+        logger.info("Compte administrateur initial créé depuis la configuration d'environnement.")
+
     def _hash_password(self, password: str) -> str:
         """Hash un mot de passe avec scrypt, conçu pour ralentir les attaques hors ligne."""
         salt = secrets.token_bytes(16)
