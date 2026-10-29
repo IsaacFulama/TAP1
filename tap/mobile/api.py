@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hmac
 import os
+from decimal import Decimal, InvalidOperation
 from html import escape
 
 from flask import Flask, jsonify, request
@@ -54,12 +55,12 @@ def create_app() -> Flask:
             return jsonify({"error": "Authentification mobile requise."}), 401
         body = request.get_json(silent=True) or {}
         try:
-            amount = float(body.get("amount", 0))
-            if amount <= 0:
+            amount = Decimal(str(body.get("amount", 0)))
+            if not amount.is_finite() or amount <= Decimal("0"):
                 raise ValueError
-        except (TypeError, ValueError):
-            return jsonify({"error": "Le montant doit être positif."}), 400
-        ok, message = ajouter_paiement_complementaire(payment_id, amount)
+        except (InvalidOperation, TypeError, ValueError):
+            return jsonify({"error": "Le montant doit être un nombre fini strictement positif."}), 400
+        ok, message = ajouter_paiement_complementaire(payment_id, float(amount))
         return jsonify({"status": "ok" if ok else "error", "message": message}), 200 if ok else 400
 
     @app.get("/portal/<token>")

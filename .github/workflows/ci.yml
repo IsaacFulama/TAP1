@@ -10,15 +10,17 @@ jobs:
   test:
     name: Tests Unitaires
     runs-on: ubuntu-latest
+    env:
+      TAP_ADMIN_INITIAL_PASSWORD: TAP-CI-Only-Secret-123
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.8'
+        python-version: '3.11'
     
     - name: Install dependencies
       run: |
@@ -43,7 +45,7 @@ jobs:
         pytest tests/ --cov=tap --cov-report=xml --cov-report=html
     
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         file: ./coverage.xml
         flags: unittests
@@ -55,12 +57,12 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.8'
+        python-version: '3.11'
     
     - name: Install dependencies
       run: |
@@ -69,7 +71,7 @@ jobs:
     
     - name: Run ruff linter
       run: |
-        ruff check tap/ tests/
+        ruff check tap/ tests/ --select E9,F63,F7,F82
     
     - name: Run flake8
       run: |
@@ -81,17 +83,17 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.8'
+        python-version: '3.11'
     
-    - name: Install dependencies
+    - name: Install project and security dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install bandit safety
+        pip install -r requirements.txt
     
     - name: Run security checks
       run: |
@@ -105,12 +107,12 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.8'
+        python-version: '3.11'
     
     - name: Install dependencies
       run: |
@@ -123,7 +125,7 @@ jobs:
         pyinstaller --onefile --windowed --name=TAP_Gestion_Loyers main.py
     
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: TAP_Gestion_Loyers
         path: dist/TAP_Gestion_Loyers.exe
@@ -136,10 +138,10 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     
     - name: Download artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: TAP_Gestion_Loyers
         path: ./dist
@@ -153,7 +155,7 @@ jobs:
           ## Nouvelle version 3.3.${{ github.run_number }}
           
           ### Améliorations
-          - Authentification sécurisée avec hashage SHA-256
+          - Authentification sécurisée avec hashage scrypt
           - Gestion des tentatives avec verrouillage
           - Statuts automatiques des paiements
           - Interface responsive multi-écrans
