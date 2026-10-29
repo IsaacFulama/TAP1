@@ -107,3 +107,25 @@ def test_sync_accepts_valid_payment(monkeypatch):
 
     assert result["status"] == "synced"
     assert any("UPDATE paiements" in query for query, _ in connection.fake_cursor.executed)
+
+
+def test_sync_rejects_even_small_overpayment(monkeypatch):
+    connection = FakeConnection([
+        None,
+        {
+            "statut_souscription": "Simple",
+            "montant_total": Decimal("100.00"),
+            "montant_paye": Decimal("90.00"),
+        },
+    ])
+    monkeypatch.setattr(offline_sync, "obtenir_connexion", lambda: connection)
+
+    result = offline_sync.apply_sync_events([{
+        "event_id": "event-overpayment-cent",
+        "event_type": "record_payment",
+        "device_id": "test-device",
+        "payload": {"payment_id": 1, "amount": "10.01", "base_paid": "90.00"},
+    }])[0]
+
+    assert result["status"] == "conflict"
+    assert not any("UPDATE paiements" in query for query, _ in connection.fake_cursor.executed)
