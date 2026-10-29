@@ -59,6 +59,8 @@ def _apply_one(event: dict[str, Any]) -> dict[str, Any]:
             return _record_result(conn, cursor, event, "conflict", "Les paiements spéciaux doivent être synchronisés depuis le desktop.")
 
         current_paid = Decimal(str(row["montant_paye"]))
+        if not current_paid.is_finite() or current_paid < Decimal("0"):
+            return _record_result(conn, cursor, event, "conflict", "Le montant déjà payé est invalide.")
         if base_paid is None:
             base_paid = current_paid
         if abs(current_paid - base_paid) > Decimal("0.01"):
@@ -67,7 +69,7 @@ def _apply_one(event: dict[str, Any]) -> dict[str, Any]:
         total = Decimal(str(row["montant_total"]))
         if not total.is_finite() or total < Decimal("0"):
             return _record_result(conn, cursor, event, "conflict", "Le total du paiement est invalide.")
-        if amount > total - current_paid + Decimal("0.01"):
+        if amount > total - current_paid:
             return _record_result(conn, cursor, event, "conflict", "Le montant dépasse le solde restant.")
 
         new_paid = current_paid + amount
