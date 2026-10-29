@@ -170,6 +170,31 @@ class TestAuthenticationManager:
         user_info = self.auth_manager.get_user_info("nonexistent")
         assert user_info is None
 
+    def test_new_password_hash_uses_scrypt(self):
+        hashed = self.auth_manager._hash_password("strong-password-123")
+        assert hashed.startswith("scrypt$")
+        assert self.auth_manager._verify_password("strong-password-123", hashed)
+        assert not self.auth_manager._verify_password("wrong-password", hashed)
+
+    def test_legacy_sha256_hash_is_upgraded_after_login(self):
+        import hashlib
+        salt = "legacy-salt"
+        old_hash = f"{salt}:" + hashlib.sha256(("TAPADM" + salt).encode()).hexdigest()
+        self.auth_manager._users["legacy-user"] = {
+            "password_hash": old_hash,
+            "created_at": None,
+            "last_login": None,
+            "is_active": True,
+        }
+        # Set a compatible legacy hash for the actual test user's password.
+        password = "legacy-password"
+        self.auth_manager._users["legacy-user"]["password_hash"] = (
+            f"{salt}:" + hashlib.sha256((password + salt).encode()).hexdigest()
+        )
+        success, _ = self.auth_manager.authenticate("legacy-user", password)
+        assert success is True
+        assert self.auth_manager._users["legacy-user"]["password_hash"].startswith("scrypt$")
+
 
 class TestAuthenticateUser:
     """Tests pour la fonction utilitaire d'authentification."""
