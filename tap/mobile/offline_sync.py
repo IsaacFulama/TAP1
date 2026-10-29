@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from mysql.connector import Error
@@ -35,8 +35,19 @@ def _apply_one(event: dict[str, Any]) -> dict[str, Any]:
             return {"event_id": event_id, "status": "synced", "idempotent": True}
         if event["event_type"] != "record_payment":
             return _record_result(conn, cursor, event, "failed", "Type d'événement non supporté.")
-        payment_id = int(payload["payment_id"])
-        amount = Decimal(str(payload["amount"]))
+
+        try:
+            payment_id = int(payload["payment_id"])
+            amount = Decimal(str(payload["amount"]))
+            base_paid = Decimal(str(payload["base_paid"])) if "base_paid" in payload else None
+        except (InvalidOperation, TypeError, ValueError, KeyError):
+            return _record_result(conn, cursor, event, "failed", "Identifiant ou montant invalide.")
+
+        if payment_id <= 0 or not amount.is_finite() or amount <= Decimal("0"):
+            return _record_result(conn, cursor, event, "failed", "Le montant doit être un nombre fini strictement positif.")
+        if base_paid is not None and (not base_paid.is_finite() or base_paid < Decimal("0")):
+            return _record_result(conn, cursor, event, "failed", "Le montant de référence est invalide.")
+
         cursor.execute(
             "SELECT statut_souscription, montant_total, montant_paye FROM paiements WHERE id = %s FOR UPDATE",
             (payment_id,),
@@ -46,11 +57,19 @@ def _apply_one(event: dict[str, Any]) -> dict[str, Any]:
             return _record_result(conn, cursor, event, "conflict", "Paiement introuvable.")
         if row["statut_souscription"] == "Spécial":
             return _record_result(conn, cursor, event, "conflict", "Les paiements spéciaux doivent être synchronisés depuis le desktop.")
-        base_paid = Decimal(str(payload.get("base_paid", row["montant_paye"])))
+
         current_paid = Decimal(str(row["montant_paye"]))
+        if base_paid is None:
+            base_paid = current_paid
         if abs(current_paid - base_paid) > Decimal("0.01"):
             return _record_result(conn, cursor, event, "conflict", "Le paiement a changé sur le serveur.")
+
         total = Decimal(str(row["montant_total"]))
+        if not total.is_finite() or total < Decimal("0"):
+            return _record_result(conn, cursor, event, "conflict", "Le total du paiement est invalide.")
+        if amount > total - current_paid + Decimal("0.01"):
+            return _record_result(conn, cursor, event, "conflict", "Le montant dépasse le solde restant.")
+
         new_paid = current_paid + amount
         status, payment_status, remaining = _statuts_montant(total, new_paid)
         cursor.execute(
@@ -58,8 +77,13 @@ def _apply_one(event: dict[str, Any]) -> dict[str, Any]:
             (float(new_paid), float(remaining), status, payment_status, payment_id),
         )
         return _record_result(conn, cursor, event, "synced", "Paiement synchronisé.")
-    except (Error, ValueError, KeyError) as exc:
-        return {"event_id": event_id, "status": "failed", "message": str(exc)}
+    except (Error, InvalidOperation, TypeError, ValueError, KeyError) as exc:
+        if conn is not None:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+        return {"event_id": event_id, "status": "failed", "message": f"Événement invalide ou erreur de base de données: {type(exc).__name__}"}
     finally:
         if cursor is not None:
             cursor.close()
