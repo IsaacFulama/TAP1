@@ -1,4 +1,3 @@
-from datetime import date
 import hashlib
 import json
 
@@ -210,10 +209,31 @@ def migrer_mois_vers_date():
 
         cursor.execute("SELECT id, mois FROM paiements")
         rows = cursor.fetchall()
-        fallback = date(2000, 1, 1)
+        parsed_rows = []
+        invalid_ids = []
 
         for paiement_id, raw_mois in rows:
-            parsed = parse_mois_saisie(raw_mois) or fallback
+            parsed = parse_mois_saisie(raw_mois)
+            if parsed is None:
+                invalid_ids.append(paiement_id)
+            else:
+                parsed_rows.append((parsed, paiement_id))
+
+        # Ne jamais convertir silencieusement une date inconnue en date arbitraire.
+        # On abandonne cette migration sans modifier les lignes si des valeurs
+        # invalides existent; elles doivent être corrigées après sauvegarde.
+        if invalid_ids:
+            preview = ", ".join(str(value) for value in invalid_ids[:20])
+            suffix = "..." if len(invalid_ids) > 20 else ""
+            print(
+                f"Migration mois -> DATE interrompue : {len(invalid_ids)} "
+                f"valeur(s) invalide(s), identifiants : {preview}{suffix}"
+            )
+            cursor.close()
+            conn.close()
+            return
+
+        for parsed, paiement_id in parsed_rows:
             cursor.execute(
                 "UPDATE paiements SET mois = %s WHERE id = %s",
                 (parsed, paiement_id),
