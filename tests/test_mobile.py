@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from tap.mobile.api import _portal_html, create_app
 from tap.mobile.offline_queue import OfflineQueue
 from tap.mobile.security import hash_access_token, tokens_match
@@ -38,10 +40,6 @@ def test_offline_queue_is_durable(tmp_path: Path):
     assert queue.pending()[0]["event_id"] == event_id
     queue.mark_result(event_id, "conflict", {"message": "changed"})
     assert queue.pending() == []
-
-
-
-import pytest
 
 
 @pytest.mark.parametrize("amount", [-1, 0, "NaN", "Infinity", "-Infinity", "not-a-number"])
