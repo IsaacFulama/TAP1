@@ -10,6 +10,8 @@ jobs:
   test:
     name: Tests Unitaires
     runs-on: ubuntu-latest
+    env:
+      TAP_ADMIN_INITIAL_PASSWORD: TAP-CI-Only-Secret-123
     
     steps:
     - name: Checkout code
