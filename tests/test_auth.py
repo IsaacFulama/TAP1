@@ -59,7 +59,7 @@ class TestAuthenticationManager:
         hashed = self.auth_manager._hash_password(password)
         
         # Le hash doit contenir un sel et le hash
-        assert ":" in hashed
+        assert hashed.startswith("scrypt$")
         assert hashed != password
         
         # Vérifier que le même mot de passe produit le même hash
