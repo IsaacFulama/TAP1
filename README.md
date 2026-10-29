@@ -52,7 +52,7 @@ proxy inverse, une authentification forte et une rotation des clés avant toute
 mise en production.
 
 ### Sécurité
-- **Authentification sécurisée** : Hashage des mots de passe avec SHA-256
+- **Authentification sécurisée** : Hashage des mots de passe avec scrypt
 - **Gestion des tentatives** : Verrouillage après 5 tentatives échouées
 - **Logging complet** : Traçabilité de toutes les actions
 - **Rapports d'erreurs** : Système de rapport d'erreurs automatique
@@ -175,11 +175,20 @@ python main.py
 
 ### Connexion
 
-Par défaut, l'application utilise les identifiants suivants :
-- **Utilisateur** : `TAPADM`
-- **Mot de passe** : `TAPADM`
+Aucun mot de passe administrateur par défaut n'est fourni. Configurez un secret
+initial d'au moins 12 caractères avant de lancer l'application.
 
-⚠️ **Important** : Changez le mot de passe par défaut en production !
+PowerShell (Windows) :
+```powershell
+$env:TAP_ADMIN_INITIAL_USERNAME = 'TAPADM'
+$env:TAP_ADMIN_INITIAL_PASSWORD = 'remplacer-par-un-secret-unique-et-long'
+python main.py
+```
+
+Le mot de passe initial est lu depuis l'environnement et n'est pas inscrit dans
+le code source. Les comptes créés par l'interface sont actuellement conservés
+en mémoire : leur persistance après redémarrage reste à implémenter. Ne déployez
+pas l'application en production avant d'avoir ajouté ce stockage persistant.
 
 ### Fonctionnalités de base
 
@@ -284,7 +293,7 @@ L'application vise une couverture de code minimale de 70%. Le rapport de couvert
 
 ### Recommandations de sécurité
 
-- Changez le mot de passe par défaut immédiatement
+- Configurez `TAP_ADMIN_INITIAL_PASSWORD` avec un secret unique d’au moins 12 caractères
 - Utilisez un utilisateur MySQL avec droits limités
 - Activez le logging en production
 - Faites des sauvegardes régulières de la base de données
